@@ -1,0 +1,81 @@
+global:
+  run_mode: "debug"
+
+log:
+  # log write directory
+  dir: "logs"
+  # log level: DEBUG|INFO|WARNING|ERROR
+  level: "DEBUG"
+  # log output: stdout|file
+  output: "stdout"
+  rotate_num: 2
+  rotate_size: 100 #100M
+  output_to_one_file: true
+
+http:
+  # http listen address
+  host: "0.0.0.0"
+  # http listen port
+  port: 18099
+  # whether print access log
+  print_access_log: true
+  # whether enable pprof
+  pprof: true
+  # http graceful shutdown timeout
+  shutdown_timeout: 30
+  # max content length, unit: byte
+  max_content_length: 10485760
+  # http server read timeout, unit: s
+  read_timeout: 10
+  # http server write timeout, unit: s
+  write_timeout: 10
+  # http server idle timeout, unit: s
+  idle_timeout: 10
+
+  # jwt authentication
+  jwt:
+    # sign key
+    signing_key: "1q2w3e4r"
+    # jwt token valid time, unit: minutes
+    access_expired: 200
+    # jwt refresh token valid time, unit: minutes
+    refresh_expired: 10080
+    # jwt token key prefix in redis
+    redis_key_prefix: "rt-jwt:"
+
+db:
+  # database type: mysql|sqlite3
+  # type: "sqlite3"
+  type: "mysql"
+  # database connection string
+  # dsn: "./data/data.db"
+  dsn: "chery-alert:1q2w3e4r@!@tcp(127.0.0.1:13306)/rate_limiter?charset=utf8mb4&parseTime=True&loc=Local"
+  # debug button
+  debug: true
+  # max life time, unit: s
+  max_life_time: 300
+  # database max open connections
+  max_open_conns: 10
+  # database max idle connections
+  max_idle_conns: 5
+  # database connection max life time, unit: s
+  conn_max_lifetime: 300
+
+redis:
+  # redis type
+  type: "single"
+  # redis address
+  address: "127.0.0.1:6379"
+  # redis password (empty = no AUTH; set here only if your redis has requirepass)
+  password: ""
+  # redis database
+  db: 0
+  # redis pool size
+  pool_size: 10
+  # master name for sentinel type
+  # master_name: "mymaster"
+  # sentinel user name
+  # sentinel_user_name: ""
+  # sentinel user password
+  # sentinel_password: ""
+ 

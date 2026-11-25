@@ -1,0 +1,291 @@
+@baseUrl = http://127.0.0.1:18099
+@configId = 2
+# The ids of the configs of the mock API, the create requests below fill them
+# in from their responses. The values here are the fallback for the clients
+# that do not run the response handlers, set them to the ids the create
+# requests returned.
+@mockConfigIdAny = 18
+@mockConfigIdClient = 19
+@mockConfigIdClientIp = 20
+@mockConfigIdIp = 21
+
+### Create Rate Limit Config
+# POST /api/v1/rate-limit/configs
+# path is required, client_id and ip are optional, a config without them
+# matches every client of the path.
+# Response: 200 {"code":0,"msg":"ok","data":{...}}
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "order pay",
+    "path": "/api/v1/order/pay",
+    "client_id": "client_001",
+    "ip": "192.168.11.2",
+    "rate": 10.5,
+    "burst": 100
+}
+
+
+### Create Rate Limit Config without ip field.
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "order pay",
+    "path": "/api/v1/order/pay2",
+    "client_id": "client_001",
+    "rate": 10.5,
+    "burst": 100
+}
+
+### List Rate Limit Configs
+# GET /api/v1/rate-limit/configs?page_size=10&page=1
+# page_size defaults to 10 and is capped at 100, page defaults to 1.
+# Response: 200 {"code":0,"msg":"ok","data":{"items":[...],"total":1}}
+GET {{baseUrl}}/api/v1/rate-limit/configs?page=1&page_size=10
+
+### Get Rate Limit Config
+# GET /api/v1/rate-limit/configs/:id
+# Response: 200 {"code":0,"msg":"ok","data":{...}}
+GET {{baseUrl}}/api/v1/rate-limit/configs/{{configId}}
+
+### Update Rate Limit Config
+# PUT /api/v1/rate-limit/configs/:id
+# The path of a config can not be edited, the client id and the ip can.
+# Response: 200 {"code":0,"msg":"ok"}
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{configId}}
+Content-Type: application/json
+
+{
+    "name": "order pay",
+    "path": "/api/v1/order/pay",
+    "client_id": "client_001",
+    "ip": "192.168.11.2",
+    "rate": 20,
+    "burst": 50
+}
+
+### Update the path of a Rate Limit Config (400)
+# The path of a config is part of the key of its rule, so it is immutable.
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{configId}}
+Content-Type: application/json
+
+{
+    "name": "order refund",
+    "path": "/api/v1/order/refund",
+    "client_id": "client_001",
+    "ip": "192.168.11.2",
+    "rate": 20,
+    "burst": 50
+}
+
+### Delete Rate Limit Config
+# DELETE /api/v1/rate-limit/configs/:id
+# Response: 200 {"code":0,"msg":"ok"}
+DELETE {{baseUrl}}/api/v1/rate-limit/configs/{{configId}}
+
+###################################################################################
+# Rate Limit Configs of the Rate Limiter Mock API
+#
+# A config of the path /api/v1/rate-limiter-mock limits the requests of the
+# mock API. The client id and the ip of a config narrow the requests it
+# matches down, the four configs below cover the four combinations:
+#
+#   a) no client id, no ip        rl:cfg:/api/v1/rate-limiter-mock:_any_:_any_
+#   b) client_001, no ip          rl:cfg:/api/v1/rate-limiter-mock:client_001:_any_
+#   c) client_001, ip 127.0.0.1   rl:cfg:/api/v1/rate-limiter-mock:client_001:127.0.0.1
+#   d) no client id, ip 127.0.0.1 rl:cfg:/api/v1/rate-limiter-mock:_any_:127.0.0.1
+#
+# A request matches every config it fits, so it takes a token from every
+# matching bucket and it is served only when all of them allow it. A request
+# without the X-Client-Id header from 127.0.0.1 matches the configs a) and d),
+# a request with the header matches the configs a), b), c) and d).
+#
+# The bucket of a rule starts full, a burst of 1 lets the first request
+# through and rejects the next one with the status code 429. The bucket is
+# refilled with one token per second, so the rejection lasts until the bucket
+# holds a token again.
+
+### a) Create the Rate Limit Config without a client id and without an ip
+# The config matches every request of the path.
+# @name createMockConfigAny
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "rate": 1,
+    "burst": 1
+}
+
+> {%
+    client.global.set("mockConfigIdAny", response.body.data.id);
+%}
+
+### b) Create the Rate Limit Config with a client id and without an ip
+# The config matches the requests of the client client_001 of the path.
+# @name createMockConfigClient
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "client_id": "client_001",
+    "rate": 1,
+    "burst": 1
+}
+
+> {%
+    client.global.set("mockConfigIdClient", response.body.data.id);
+%}
+
+### c) Create the Rate Limit Config with a client id and with an ip
+# The config matches the requests of the client client_001 from 127.0.0.1.
+# @name createMockConfigClientIp
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "client_id": "client_001",
+    "ip": "127.0.0.1",
+    "rate": 1,
+    "burst": 1
+}
+
+> {%
+    client.global.set("mockConfigIdClientIp", response.body.data.id);
+%}
+
+### d) Create the Rate Limit Config without a client id and with an ip
+# The config matches the requests of every client from 127.0.0.1.
+# @name createMockConfigIp
+POST {{baseUrl}}/api/v1/rate-limit/configs
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "ip": "127.0.0.1",
+    "rate": 1,
+    "burst": 1
+}
+
+> {%
+    client.global.set("mockConfigIdIp", response.body.data.id);
+%}
+
+### Rate Limiter Mock without a client id
+# GET /api/v1/rate-limiter-mock
+# This is a business API, so it is limited by the rate limit configs like every
+# other one. request_total counts every request that reached the API,
+# rate_per_second counts the requests of the last second.
+# The request comes from 127.0.0.1 and carries no client id, so it matches the
+# configs a) and d) and takes a token from both of their buckets.
+# Response: 200 {"code":0,"msg":"ok","data":{"request_total":2,"rate_per_second":1}}
+# Response once the buckets are empty: 429 {"code":429,"msg":"too many requests"}
+GET {{baseUrl}}/api/v1/rate-limiter-mock
+
+### Rate Limiter Mock with a client id
+# The client id of a request is taken from the X-Client-Id header. The request
+# matches the configs a), b), c) and d), so it takes a token from four buckets.
+GET {{baseUrl}}/api/v1/rate-limiter-mock
+X-Client-Id: client_001
+
+### Rate Limiter Mock from another ip
+# The ip of a request is taken from the X-Forwarded-For header, it falls back
+# to the address the request came from. The request comes from 192.168.11.2
+# and carries no client id, so it matches the config a) only.
+GET {{baseUrl}}/api/v1/rate-limiter-mock
+X-Forwarded-For: 192.168.11.2
+
+### Rate Limiter Mock from another ip with a client id
+# The request comes from 192.168.11.2 and carries the client client_001, so it
+# matches the configs a) and b).
+GET {{baseUrl}}/api/v1/rate-limiter-mock
+X-Forwarded-For: 192.168.11.2
+X-Client-Id: client_001
+
+### Get the Rate Limit Config of the Rate Limiter Mock API
+# GET /api/v1/rate-limit/configs/:id
+# Response: 200 {"code":0,"msg":"ok","data":{...}}
+GET {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdAny}}
+
+### Get the Rate Limit Config of the Rate Limiter Mock API with a client id
+GET {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClient}}
+
+### Get the Rate Limit Config of the Rate Limiter Mock API with a client id and an ip
+GET {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClientIp}}
+
+### Get the Rate Limit Config of the Rate Limiter Mock API with an ip
+GET {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdIp}}
+
+### Update the Rate Limit Config of the Rate Limiter Mock API
+# PUT /api/v1/rate-limit/configs/:id
+# The rate and the burst are raised, the path of the config can not be edited.
+# Response: 200 {"code":0,"msg":"ok"}
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdAny}}
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "rate": 5,
+    "burst": 5
+}
+
+### Update the Rate Limit Config of the Rate Limiter Mock API with a client id
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClient}}
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "client_id": "client_001",
+    "rate": 5,
+    "burst": 5
+}
+
+### Update the Rate Limit Config of the Rate Limiter Mock API with a client id and an ip
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClientIp}}
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "client_id": "client_001",
+    "ip": "127.0.0.1",
+    "rate": 5,
+    "burst": 5
+}
+
+### Update the Rate Limit Config of the Rate Limiter Mock API with an ip
+PUT {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdIp}}
+Content-Type: application/json
+
+{
+    "name": "rate limiter mock",
+    "path": "/api/v1/rate-limiter-mock",
+    "ip": "127.0.0.1",
+    "rate": 5,
+    "burst": 5
+}
+
+### Delete the Rate Limit Config of the Rate Limiter Mock API
+# DELETE /api/v1/rate-limit/configs/:id
+# The rule is dropped from redis, so the mock API is not limited by it anymore.
+# Response: 200 {"code":0,"msg":"ok"}
+DELETE {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdAny}}
+
+### Delete the Rate Limit Config of the Rate Limiter Mock API with a client id
+DELETE {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClient}}
+
+### Delete the Rate Limit Config of the Rate Limiter Mock API with a client id and an ip
+DELETE {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdClientIp}}
+
+### Delete the Rate Limit Config of the Rate Limiter Mock API with an ip
+DELETE {{baseUrl}}/api/v1/rate-limit/configs/{{mockConfigIdIp}}
